@@ -1,4 +1,8 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -17,8 +21,17 @@ public class Main {
       serverSocket.setReuseAddress(true);
       // Wait for connection from client.
       clientSocket = serverSocket.accept();
-      // Send hardcoded PONG for now
-      clientSocket.getOutputStream().write("+PONG\r\n".getBytes());
+      // Send hardcoded PONG for all input for now
+      BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+      BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+      String line;
+      while ((line = reader.readLine()) != null) {
+        System.out.println("Received line: " + line);
+        if (line.toUpperCase().contains("PING")) {
+          writer.write("+PONG\r\n");
+          writer.flush();
+        }
+      }
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     } finally {
