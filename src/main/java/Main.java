@@ -5,6 +5,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
 
@@ -18,13 +20,23 @@ public class Main {
       // ensures that we don't run into 'Address already in use' errors
       serverSocket.setReuseAddress(true);
       // Wait for connection from client and handle
-      handleConnection(serverSocket.accept());
+      listenAndHandleConnections(serverSocket);
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
     }
   }
 
-  public static void handleConnection(Socket clientSocket) throws IOException {
+  private static void listenAndHandleConnections(ServerSocket serverSocket) {
+    try (ExecutorService executor = Executors.newFixedThreadPool(10)) {
+      while (true) {
+        executor.submit(new ConnectionHandler(serverSocket.accept()));
+      }
+    } catch (IOException e) {
+      System.out.println("IOException: " + e.getMessage());
+    }
+  }
+
+  private static void handleConnection(Socket clientSocket) throws IOException {
     try (clientSocket) {
       BufferedReader reader = new BufferedReader(
           new InputStreamReader(clientSocket.getInputStream()));
@@ -43,4 +55,15 @@ public class Main {
       System.out.println("IOException: " + e.getMessage());
     }
   }
+
+  private record ConnectionHandler(Socket clientSocket) implements Runnable {
+    @Override
+      public void run() {
+        try {
+          handleConnection(clientSocket);
+        } catch (IOException e) {
+          System.out.println("IOException: " + e.getMessage());
+        }
+      }
+    }
 }
