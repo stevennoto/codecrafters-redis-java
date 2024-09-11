@@ -5,6 +5,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -42,17 +43,32 @@ public class Main {
           new InputStreamReader(clientSocket.getInputStream()));
       BufferedWriter writer = new BufferedWriter(
           new OutputStreamWriter(clientSocket.getOutputStream()));
-      String line;
-      while ((line = reader.readLine()) != null) {
-        System.out.println("Received line: " + line);
-        if (line.toUpperCase().contains("PING")) {
-          System.out.println("Sending line: PONG");
-          writer.write("+PONG\r\n");
-          writer.flush();
-        }
+      // Main listening loop
+      while (true) {
+        List<String> commandArray = RespUtil.readArray(reader);
+        System.out.println("Received command: " + String.join(",", commandArray));
+        String reply = processSimpleCommand(commandArray);
+        System.out.println("Sending reply: " + String.join(",", commandArray));
+        writer.write(reply);
+        writer.flush();
       }
-    } catch (IOException e) {
-      System.out.println("IOException: " + e.getMessage());
+    } catch (IOException | RespException e) {
+      System.out.println("Exception: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
+  private static String processSimpleCommand(List<String> commandArray) {
+    String command = commandArray.getFirst().toUpperCase();
+    switch (command) {
+      case "PING":
+        return "+PONG\r\n";
+      case "ECHO":
+        String payload = commandArray.get(1);
+        // TODO add func for encoding bulk strings
+        return "$" + payload.length() + "\r\n" + payload + "\r\n";
+      default:
+        return "";
     }
   }
 
