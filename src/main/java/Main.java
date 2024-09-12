@@ -50,7 +50,7 @@ public class Main {
         List<String> commandArray = RespUtil.readArray(reader);
         System.out.println("Received command: " + String.join(",", commandArray));
         String reply = processSimpleCommand(commandArray);
-        System.out.println("Sending reply: " + String.join(",", commandArray));
+        System.out.println("Sending reply: " + reply);
         writer.write(reply);
         writer.flush();
       }
@@ -60,7 +60,8 @@ public class Main {
     }
   }
 
-  private static final Map<String, String> keyValueStore = new HashMap<>();
+  private record RedisValue(String value, Long expiryTime) {}
+  private static final Map<String, RedisValue> keyValueStore = new HashMap<>();
 
   private static String processSimpleCommand(List<String> commandArray) {
     String command = commandArray.getFirst().toUpperCase();
@@ -73,13 +74,22 @@ public class Main {
       case "SET":
         String keyToSet = commandArray.get(1);
         String valueToSet = commandArray.get(2);
-        System.out.println("Setting key: " + keyToSet + " to value: " + valueToSet);
-        keyValueStore.put(keyToSet, valueToSet);
-        System.out.println("Setted key: " + keyToSet + " to value: " + valueToSet);
+        Long expiryTime = null;
+        if (commandArray.size() > 3 && commandArray.get(3).equalsIgnoreCase("PX")) {
+          // TODO handle error if expiry time is not a number
+          long expiryInMillis = Long.parseLong(commandArray.get(4));
+          expiryTime = System.currentTimeMillis() + expiryInMillis;
+        }
+        keyValueStore.put(keyToSet, new RedisValue(valueToSet, expiryTime));
         return RespUtil.serializeBulkString("OK");
       case "GET":
         String keyToGet = commandArray.get(1);
-        return RespUtil.serializeBulkString(keyValueStore.get(keyToGet));
+        RedisValue valueToGet = keyValueStore.get(keyToGet);
+        if (valueToGet.expiryTime != null && valueToGet.expiryTime < System.currentTimeMillis()) {
+          keyValueStore.remove(keyToGet);
+          return RespUtil.serializeBulkString(null);
+        }
+        return RespUtil.serializeBulkString(valueToGet.value);
       default:
         return "";
     }
