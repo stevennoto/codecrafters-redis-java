@@ -5,7 +5,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,15 +60,26 @@ public class Main {
     }
   }
 
+  private static final Map<String, String> keyValueStore = new HashMap<>();
+
   private static String processSimpleCommand(List<String> commandArray) {
     String command = commandArray.getFirst().toUpperCase();
     switch (command) {
       case "PING":
-        return "+PONG\r\n";
+        return RespUtil.serializeBulkString("PONG");
       case "ECHO":
         String payload = commandArray.get(1);
-        // TODO add func for encoding bulk strings
-        return "$" + payload.length() + "\r\n" + payload + "\r\n";
+        return RespUtil.serializeBulkString(payload);
+      case "SET":
+        String keyToSet = commandArray.get(1);
+        String valueToSet = commandArray.get(2);
+        System.out.println("Setting key: " + keyToSet + " to value: " + valueToSet);
+        keyValueStore.put(keyToSet, valueToSet);
+        System.out.println("Setted key: " + keyToSet + " to value: " + valueToSet);
+        return RespUtil.serializeBulkString("OK");
+      case "GET":
+        String keyToGet = commandArray.get(1);
+        return RespUtil.serializeBulkString(keyValueStore.get(keyToGet));
       default:
         return "";
     }

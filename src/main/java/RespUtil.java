@@ -49,4 +49,16 @@ public class RespUtil {
     }
   }
 
+  public static String serializeSimpleString(String text) {
+    return "+" + (text == null ? "" : text) + "\r\n";
+  }
+
+  public static String serializeBulkString(String text) {
+    if (text == null) {
+      return "$-1\r\n";
+    } else {
+      return "$" + text.length() + "\r\n" + text + "\r\n";
+    }
+  }
+
 }
