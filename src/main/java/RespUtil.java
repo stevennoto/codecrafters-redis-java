@@ -61,4 +61,13 @@ public class RespUtil {
     }
   }
 
+  public static String serializeArray(List<String> entries) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("*").append(entries.size()).append("\r\n");
+    for (String entry : entries) {
+      sb.append(serializeBulkString(entry));
+    }
+    return sb.toString();
+  }
+
 }

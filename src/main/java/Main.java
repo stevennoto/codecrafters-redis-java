@@ -5,7 +5,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -15,7 +17,13 @@ public class Main {
 
   private static final int PORT = 6379;
 
+  private static final Map<RedisConfig, String> CONFIG = new HashMap<>();
+
   public static void main(String[] args){
+    if (args != null && args.length > 0) {
+      processConfig(new LinkedList<>(Arrays.asList(args)));
+    }
+
     ServerSocket serverSocket;
     try {
       serverSocket = new ServerSocket(PORT);
@@ -26,6 +34,29 @@ public class Main {
       listenAndHandleConnections(serverSocket);
     } catch (IOException e) {
       System.out.println("IOException: " + e.getMessage());
+    }
+  }
+
+  // Process command line args and set config. Currently supports only --dir and --dbfilename
+  private static void processConfig(LinkedList<String> options) {
+    while (!options.isEmpty()) {
+      String option = options.removeFirst().toLowerCase();
+      if (!option.startsWith("--")) {
+        System.out.println("Unknown option: " + option);
+        continue;
+      }
+      RedisConfig redisConfig = RedisConfig.fromName(option.substring(2));
+      if (redisConfig != null) {
+        if (options.isEmpty() || options.getFirst().startsWith("--")) {
+          System.out.println("Missing value for option --dir");
+          continue;
+        }
+        String optionValue = options.removeFirst();
+        CONFIG.put(redisConfig, optionValue);
+        System.out.println("Setting config " + redisConfig.getName() + " to: " + optionValue);
+      } else {
+        System.out.println("Unknown option: " + option);
+      }
     }
   }
 
@@ -63,14 +94,27 @@ public class Main {
   private record RedisValue(String value, Long expiryTime) {}
   private static final Map<String, RedisValue> keyValueStore = new HashMap<>();
 
+  // Process simple commands. Currently supports:
+  // - PING
+  // - ECHO <value>
+  // - CONFIG GET <config-name> // only one at a time so far
+  // - SET <key> <value> [PX <expiry in ms>]
+  // - GET <key>
   private static String processSimpleCommand(List<String> commandArray) {
     String command = commandArray.getFirst().toUpperCase();
     switch (command) {
       case "PING":
-        return RespUtil.serializeBulkString("PONG");
+        return RespUtil.serializeSimpleString("PONG");
       case "ECHO":
         String payload = commandArray.get(1);
         return RespUtil.serializeBulkString(payload);
+      case "CONFIG":
+        String getString = commandArray.get(1);
+        RedisConfig configToGet = RedisConfig.fromName(commandArray.get(2));
+        if (!getString.equalsIgnoreCase("get") || configToGet == null) {
+          return RespUtil.serializeBulkString(null);
+        }
+        return RespUtil.serializeArray(Arrays.asList(configToGet.getName(), CONFIG.get(RedisConfig.DIR)));
       case "SET":
         String keyToSet = commandArray.get(1);
         String valueToSet = commandArray.get(2);
