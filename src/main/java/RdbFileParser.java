@@ -12,25 +12,23 @@ public class RdbFileParser {
       skipToByte(fileInputStream, 0xFB); // skip to table size info
       getNextByte(fileInputStream); // skip hash size info
       getNextByte(fileInputStream); // skip hash size info
-      int probablyZeroes = getNextByte(fileInputStream); // skip type/encoding flag
-      // assume no expire time info ie FC or FD, 00 for value type=string
-      int sizeOfFirstKey = getSizeEncoding(fileInputStream);
-      System.out.println("Size of first key: " + sizeOfFirstKey);
-      String firstKey = asciiToString(getNBytesAscii(fileInputStream, sizeOfFirstKey));
-      System.out.println("First key: " + firstKey);
-      int sizeOfFirstValue = getSizeEncoding(fileInputStream);
-      System.out.println("Size of first value: " + sizeOfFirstValue);
-      String firstValue = asciiToString(getNBytesAscii(fileInputStream, sizeOfFirstValue));
-      System.out.println("First value: " + firstValue);
-      keyValueStore.put(firstKey, new RedisValue(firstValue));
+      while (true) {
+        int zeroesOrEndOfFile = getNextByte(fileInputStream); // type/encoding flag, or EOF flag
+        if (zeroesOrEndOfFile == 0xFF) { break; }
+        // assume no expire time info ie FC or FD, 00 for value type=string
+        int keySize = getSizeEncoding(fileInputStream);
+        String key = asciiToString(getNBytesAscii(fileInputStream, keySize));
+        int valueSize = getSizeEncoding(fileInputStream);
+        String value = asciiToString(getNBytesAscii(fileInputStream, valueSize));
+        keyValueStore.put(key, new RedisValue(value));
+        System.out.println("Loading key: " + key + ", value: " + value + " from RDB file");
+      }
 
       // TODO:
-      // open file (if not present, empty db)
       // verify header
-      // read and ignore metadata
-      // read and process database
+      // read metadata
+      // read and process database including other data formats
       // verify end of file, checksum
-      // return all k/v's
 
     } catch (FileNotFoundException e) {
       System.out.println("File not found: " + e.getMessage());
