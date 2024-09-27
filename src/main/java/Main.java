@@ -5,6 +5,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -21,7 +22,11 @@ public class Main {
 
   public static void main(String[] args){
     if (args != null && args.length > 0) {
-      processConfig(new LinkedList<>(Arrays.asList(args)));
+      initializeConfig(new LinkedList<>(Arrays.asList(args)));
+    }
+
+    if (!CONFIG.isEmpty()) {
+      processConfig();
     }
 
     ServerSocket serverSocket;
@@ -37,8 +42,8 @@ public class Main {
     }
   }
 
-  // Process command line args and set config. Currently supports only --dir and --dbfilename
-  private static void processConfig(LinkedList<String> options) {
+  // Initialize config from command line args. Currently supports only --dir and --dbfilename
+  private static void initializeConfig(LinkedList<String> options) {
     while (!options.isEmpty()) {
       String option = options.removeFirst().toLowerCase();
       if (!option.startsWith("--")) {
@@ -58,6 +63,13 @@ public class Main {
         System.out.println("Unknown option: " + option);
       }
     }
+  }
+
+  // Process initialized config. Currently supports only loading RDB file
+  private static void processConfig() {
+    // for now just load first key
+    String firstKey = RdbFileParser.parseRdbFileForFirstKey(CONFIG.get(RedisConfig.DIR), CONFIG.get(RedisConfig.DBFILENAME));
+    if (firstKey != null) keyValueStore.put(firstKey, new RedisValue(""));
   }
 
   private static void listenAndHandleConnections(ServerSocket serverSocket) {
@@ -91,7 +103,9 @@ public class Main {
     }
   }
 
-  private record RedisValue(String value, Long expiryTime) {}
+  private record RedisValue(String value, Long expiryTime) {
+    RedisValue(String value) { this(value, null); }
+  }
   private static final Map<String, RedisValue> keyValueStore = new HashMap<>();
 
   // Process simple commands. Currently supports:
@@ -134,6 +148,14 @@ public class Main {
           return RespUtil.serializeBulkString(null);
         }
         return RespUtil.serializeBulkString(valueToGet.value);
+      case "KEYS":
+        String keysPattern = commandArray.get(1);
+        if (keysPattern.equals("*")) {
+          return RespUtil.serializeArray(new ArrayList<>(keyValueStore.keySet()));
+        } else {
+          // TODO handle pattern matching
+          return RespUtil.serializeBulkString(null);
+        }
       default:
         return "";
     }
