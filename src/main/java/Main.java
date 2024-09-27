@@ -68,8 +68,10 @@ public class Main {
   // Process initialized config. Currently supports only loading RDB file
   private static void processConfig() {
     // for now just load first key
-    String firstKey = RdbFileParser.parseRdbFileForFirstKey(CONFIG.get(RedisConfig.DIR), CONFIG.get(RedisConfig.DBFILENAME));
-    if (firstKey != null) keyValueStore.put(firstKey, new RedisValue(""));
+    RdbFileParser.parseRdbFileAndLoadKeysValues(
+        CONFIG.get(RedisConfig.DIR),
+        CONFIG.get(RedisConfig.DBFILENAME),
+        keyValueStore);
   }
 
   private static void listenAndHandleConnections(ServerSocket serverSocket) {
@@ -103,9 +105,6 @@ public class Main {
     }
   }
 
-  private record RedisValue(String value, Long expiryTime) {
-    RedisValue(String value) { this(value, null); }
-  }
   private static final Map<String, RedisValue> keyValueStore = new HashMap<>();
 
   // Process simple commands. Currently supports:
@@ -143,11 +142,11 @@ public class Main {
       case "GET":
         String keyToGet = commandArray.get(1);
         RedisValue valueToGet = keyValueStore.get(keyToGet);
-        if (valueToGet.expiryTime != null && valueToGet.expiryTime < System.currentTimeMillis()) {
+        if (valueToGet.expiryTime() != null && valueToGet.expiryTime() < System.currentTimeMillis()) {
           keyValueStore.remove(keyToGet);
           return RespUtil.serializeBulkString(null);
         }
-        return RespUtil.serializeBulkString(valueToGet.value);
+        return RespUtil.serializeBulkString(valueToGet.value());
       case "KEYS":
         String keysPattern = commandArray.get(1);
         if (keysPattern.equals("*")) {

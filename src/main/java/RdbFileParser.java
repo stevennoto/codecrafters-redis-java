@@ -1,9 +1,10 @@
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Map;
 
 public class RdbFileParser {
-  public static String parseRdbFileForFirstKey(String dir, String filename) {
+  public static void parseRdbFileAndLoadKeysValues(String dir, String filename, Map<String, RedisValue> keyValueStore) {
     String rdbFileName = dir + "/" + filename;
     try (FileInputStream fileInputStream = new FileInputStream(rdbFileName)) {
       verifyRdbFile(fileInputStream);
@@ -14,10 +15,14 @@ public class RdbFileParser {
       int probablyZeroes = getNextByte(fileInputStream); // skip type/encoding flag
       // assume no expire time info ie FC or FD, 00 for value type=string
       int sizeOfFirstKey = getSizeEncoding(fileInputStream);
-      //System.out.println("Size of first key: " + sizeOfFirstKey);
+      System.out.println("Size of first key: " + sizeOfFirstKey);
       String firstKey = asciiToString(getNBytesAscii(fileInputStream, sizeOfFirstKey));
-      //System.out.println("First key: " + firstKey);
-      return firstKey;
+      System.out.println("First key: " + firstKey);
+      int sizeOfFirstValue = getSizeEncoding(fileInputStream);
+      System.out.println("Size of first value: " + sizeOfFirstValue);
+      String firstValue = asciiToString(getNBytesAscii(fileInputStream, sizeOfFirstValue));
+      System.out.println("First value: " + firstValue);
+      keyValueStore.put(firstKey, new RedisValue(firstValue));
 
       // TODO:
       // open file (if not present, empty db)
@@ -29,10 +34,8 @@ public class RdbFileParser {
 
     } catch (FileNotFoundException e) {
       System.out.println("File not found: " + e.getMessage());
-      return null;
     } catch (Exception e) {
       System.out.println("Error reading file: " + e.getMessage());
-      return null;
     }
   }
 
@@ -92,7 +95,7 @@ public class RdbFileParser {
       case 0x80: // If the first two bits are 0b10: The size is the next 4 bytes, in big-endian (read left-to-right).
         return getNextByte(fileInputStream) << 8 | getNextByte(fileInputStream);
       case 0xC0: // If the first two bits are 0b11: The remaining 6 bits specify a type of string encoding.
-        // TODO this case
+        // TODO handle additional string encodings
         return getNextByte(fileInputStream) << 8 | getNextByte(fileInputStream);
       default:
         throw new RdbException("Invalid size encoding");
