@@ -142,7 +142,12 @@ public class Main {
       case "GET":
         String keyToGet = commandArray.get(1);
         RedisValue valueToGet = keyValueStore.get(keyToGet);
+        if (valueToGet == null) {
+          return RespUtil.serializeBulkString(null);
+        }
         if (valueToGet.expiryTime() != null && valueToGet.expiryTime() < System.currentTimeMillis()) {
+          // TODO: expire eagerly instead of lazily on GET?
+          System.out.println("Expiring key: " + keyToGet + " with expiryTime: " + valueToGet.expiryTime());
           keyValueStore.remove(keyToGet);
           return RespUtil.serializeBulkString(null);
         }

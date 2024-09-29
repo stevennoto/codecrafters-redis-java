@@ -7,29 +7,34 @@ public class RdbFileParser {
   public static void parseRdbFileAndLoadKeysValues(String dir, String filename, Map<String, RedisValue> keyValueStore) {
     String rdbFileName = dir + "/" + filename;
     try (FileInputStream fileInputStream = new FileInputStream(rdbFileName)) {
-      verifyRdbFile(fileInputStream);
-      skipToByte(fileInputStream, 0xFE); // skip to db
+      verifyRdbFile(fileInputStream); // TODO: verify rest of header
+      skipToByte(fileInputStream, 0xFE); // skip to db // TODO: process metadata
       skipToByte(fileInputStream, 0xFB); // skip to table size info
-      getNextByte(fileInputStream); // skip hash size info
-      getNextByte(fileInputStream); // skip hash size info
+      getNextByte(fileInputStream); // skip hash size info TODO: process hash size
+      getNextByte(fileInputStream); // skip hash size info TODO: process hash size
       while (true) {
-        int zeroesOrEndOfFile = getNextByte(fileInputStream); // type/encoding flag, or EOF flag
-        if (zeroesOrEndOfFile == 0xFF) { break; }
-        // assume no expire time info ie FC or FD, 00 for value type=string
+        int valueTypeOrFlag = getNextByte(fileInputStream); // TODO: handle other type/encodings than 00 (string)
+        if (valueTypeOrFlag == 0xFF) { break; } // TODO verify end of file checksum
+        Long expiryTime = null;
+        if (valueTypeOrFlag == 0xFC) {
+          expiryTime = getNByteUnsignedInt(fileInputStream, 8);
+          valueTypeOrFlag = getNextByte(fileInputStream);
+        } else if (valueTypeOrFlag == 0xFD) {
+          expiryTime = getNByteUnsignedInt(fileInputStream, 4);
+          expiryTime *= 1_000;
+          valueTypeOrFlag = getNextByte(fileInputStream);
+        }
         int keySize = getSizeEncoding(fileInputStream);
         String key = asciiToString(getNBytesAscii(fileInputStream, keySize));
         int valueSize = getSizeEncoding(fileInputStream);
         String value = asciiToString(getNBytesAscii(fileInputStream, valueSize));
-        keyValueStore.put(key, new RedisValue(value));
-        System.out.println("Loading key: " + key + ", value: " + value + " from RDB file");
+        if (expiryTime != null && expiryTime < System.currentTimeMillis()) {
+          System.out.println("Skipping key: " + key + ", value: " + value + "; expiryTime " + expiryTime + " is in the past");
+          continue;
+        }
+        keyValueStore.put(key, new RedisValue(value, expiryTime));
+        System.out.println("Loading key: " + key + ", value: " + value + ", expiryTime: " + expiryTime + " from RDB file");
       }
-
-      // TODO:
-      // verify header
-      // read metadata
-      // read and process database including other data formats
-      // verify end of file, checksum
-
     } catch (FileNotFoundException e) {
       System.out.println("File not found: " + e.getMessage());
     } catch (Exception e) {
@@ -84,6 +89,7 @@ public class RdbFileParser {
   private static int getSizeEncoding(FileInputStream fileInputStream) throws RdbException {
     int firstByte = getNextByte(fileInputStream);
     System.out.println("First byte for size encoding: " + firstByte);
+    // Check for encoding type and return size based on type
     int encoding = firstByte & 0xC0;
     switch (encoding) {
       case 0x00: // If the first two bits are 0b00: The size is the remaining 6 bits of the byte.
@@ -98,5 +104,18 @@ public class RdbFileParser {
       default:
         throw new RdbException("Invalid size encoding");
     }
+  }
+
+  private static long getNByteUnsignedInt(FileInputStream fileInputStream, int numBytes) throws RdbException {
+    int[] bytes = new int[numBytes];
+    for (int i = 0; i < numBytes; i++) {
+      bytes[i] = getNextByte(fileInputStream);
+    }
+    long retVal = 0;
+    for (int i = numBytes - 1; i >= 0; i--) {
+      retVal = (retVal << 8) | bytes[i];
+    }
+    //System.out.println("Read unsigned int of " + numBytes + " bytes: " + retVal);
+    return retVal;
   }
 }
