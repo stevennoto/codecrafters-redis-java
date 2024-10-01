@@ -1,7 +1,8 @@
 public enum RedisConfig {
   DIR("dir"),
   DBFILENAME("dbfilename"),
-  PORT("port");
+  PORT("port"),
+  REPLICA_OF("replicaof");
 
   private final String name;
 

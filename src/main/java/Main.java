@@ -20,6 +20,9 @@ public class Main {
 
   private static final Map<RedisConfig, String> CONFIG = new HashMap<>();
 
+  private static boolean IS_MASTER = true;
+  private static String REPLICA_OF = null;
+
   public static void main(String[] args){
     if (args != null && args.length > 0) {
       initializeConfig(new LinkedList<>(Arrays.asList(args)));
@@ -82,6 +85,12 @@ public class Main {
       }
       System.out.println("Setting port to: " + CONFIG.get(RedisConfig.PORT));
     }
+
+    if (CONFIG.containsKey(RedisConfig.REPLICA_OF)) {
+      IS_MASTER = false;
+      REPLICA_OF = CONFIG.get(RedisConfig.REPLICA_OF);
+      System.out.println("Setting as slave replica of: " + REPLICA_OF);
+    }
   }
 
   private static void listenAndHandleConnections(ServerSocket serverSocket) {
@@ -140,7 +149,7 @@ public class Main {
         return RespUtil.serializeArray(Arrays.asList(configToGet.getName(), CONFIG.get(RedisConfig.DIR)));
       case "INFO":
         // TODO: for now only supporting `INFO replication`
-        return RespUtil.serializeBulkString("# Replication\nrole:master");
+        return RespUtil.serializeBulkString("# Replication\nrole:" + (IS_MASTER ? "master" : "slave"));
       case "SET":
         String keyToSet = commandArray.get(1);
         String valueToSet = commandArray.get(2);
