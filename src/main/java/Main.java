@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 
 public class Main {
 
-  private static final int PORT = 6379;
+  private static int PORT = 6379;
 
   private static final Map<RedisConfig, String> CONFIG = new HashMap<>();
 
@@ -42,7 +42,7 @@ public class Main {
     }
   }
 
-  // Initialize config from command line args. Currently supports only --dir and --dbfilename
+  // Initialize config from command line args. Currently, supports dir/dbfilename, port
   private static void initializeConfig(LinkedList<String> options) {
     while (!options.isEmpty()) {
       String option = options.removeFirst().toLowerCase();
@@ -53,7 +53,7 @@ public class Main {
       RedisConfig redisConfig = RedisConfig.fromName(option.substring(2));
       if (redisConfig != null) {
         if (options.isEmpty() || options.getFirst().startsWith("--")) {
-          System.out.println("Missing value for option --dir");
+          System.out.println("Missing value for option: " + redisConfig.getName());
           continue;
         }
         String optionValue = options.removeFirst();
@@ -65,13 +65,23 @@ public class Main {
     }
   }
 
-  // Process initialized config. Currently supports only loading RDB file
+  // Process initialized config. Currently, supports dir/dbfilename, port
   private static void processConfig() {
-    // for now just load first key
-    RdbFileParser.parseRdbFileAndLoadKeysValues(
-        CONFIG.get(RedisConfig.DIR),
-        CONFIG.get(RedisConfig.DBFILENAME),
-        keyValueStore);
+    if (CONFIG.containsKey(RedisConfig.DIR) && CONFIG.containsKey(RedisConfig.DBFILENAME)) {
+      RdbFileParser.parseRdbFileAndLoadKeysValues(
+          CONFIG.get(RedisConfig.DIR),
+          CONFIG.get(RedisConfig.DBFILENAME),
+          keyValueStore);
+    }
+
+    if (CONFIG.containsKey(RedisConfig.PORT)) {
+      try {
+        PORT = Integer.parseInt(CONFIG.get(RedisConfig.PORT));
+      } catch (NumberFormatException e) {
+        System.out.println("Invalid port number: " + CONFIG.get(RedisConfig.PORT));
+      }
+      System.out.println("Setting port to: " + CONFIG.get(RedisConfig.PORT));
+    }
   }
 
   private static void listenAndHandleConnections(ServerSocket serverSocket) {
