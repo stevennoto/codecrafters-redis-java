@@ -138,6 +138,9 @@ public class Main {
           return RespUtil.serializeBulkString(null);
         }
         return RespUtil.serializeArray(Arrays.asList(configToGet.getName(), CONFIG.get(RedisConfig.DIR)));
+      case "INFO":
+        // TODO: for now only supporting `INFO replication`
+        return RespUtil.serializeBulkString("# Replication\nrole:master");
       case "SET":
         String keyToSet = commandArray.get(1);
         String valueToSet = commandArray.get(2);
