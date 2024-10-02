@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -22,6 +23,8 @@ public class Main {
 
   private static boolean IS_MASTER = true;
   private static String REPLICA_OF = null;
+  private static String MASTER_REPLID;
+  private static int MASTER_REPL_OFFSET = 0;
 
   public static void main(String[] args){
     if (args != null && args.length > 0) {
@@ -91,6 +94,8 @@ public class Main {
       REPLICA_OF = CONFIG.get(RedisConfig.REPLICA_OF);
       System.out.println("Setting as slave replica of: " + REPLICA_OF);
     }
+    MASTER_REPLID = generateRandomAlphaNumericString(40);
+    MASTER_REPL_OFFSET = 0;
   }
 
   private static void listenAndHandleConnections(ServerSocket serverSocket) {
@@ -149,7 +154,12 @@ public class Main {
         return RespUtil.serializeArray(Arrays.asList(configToGet.getName(), CONFIG.get(RedisConfig.DIR)));
       case "INFO":
         // TODO: for now only supporting `INFO replication`
-        return RespUtil.serializeBulkString("# Replication\nrole:" + (IS_MASTER ? "master" : "slave"));
+        return RespUtil.serializeBulkString(
+            "# Replication\n"
+                + "role:" + (IS_MASTER ? "master" : "slave") + "\n"
+                + "master_replid:" + MASTER_REPLID + "\n"
+                + "master_repl_offset:" + MASTER_REPL_OFFSET
+        );
       case "SET":
         String keyToSet = commandArray.get(1);
         String valueToSet = commandArray.get(2);
@@ -185,6 +195,16 @@ public class Main {
       default:
         return "";
     }
+  }
+
+  private static String generateRandomAlphaNumericString(int length) {
+    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    StringBuilder text = new StringBuilder();
+    Random rand = new Random();
+    while (text.length() < length) {
+      text.append(chars.charAt((int) (rand.nextFloat() * chars.length())));
+    }
+    return text.toString();
   }
 
   private record ConnectionHandler(Socket clientSocket) implements Runnable {
