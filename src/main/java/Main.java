@@ -22,7 +22,6 @@ public class Main {
   private static final Map<RedisConfig, String> CONFIG = new HashMap<>();
 
   private static boolean IS_MASTER = true;
-  private static String REPLICA_OF = null;
   private static String MASTER_REPLID;
   private static int MASTER_REPL_OFFSET = 0;
 
@@ -90,9 +89,18 @@ public class Main {
     }
 
     if (CONFIG.containsKey(RedisConfig.REPLICA_OF)) {
-      IS_MASTER = false;
-      REPLICA_OF = CONFIG.get(RedisConfig.REPLICA_OF);
-      System.out.println("Setting as slave replica of: " + REPLICA_OF);
+      try {
+        String[] replicaOfHostPort = CONFIG.get(RedisConfig.REPLICA_OF).split(" ");
+        String replicaOfHost = replicaOfHostPort[0];
+        int replicaOfPort = Integer.parseInt(replicaOfHostPort[1]);
+        RedisClient redisClient = new RedisClient(replicaOfHost, replicaOfPort);
+        redisClient.send(RespUtil.serializeArray(List.of("PING")));
+        IS_MASTER = false;
+        System.out.println("Set as slave replica of: " + replicaOfHost + ":" + replicaOfPort);
+      } catch (Exception e) {
+        System.out.println("Error setting as slave replica of: " + CONFIG.get(RedisConfig.REPLICA_OF));
+        e.printStackTrace();
+      }
     }
     MASTER_REPLID = generateRandomAlphaNumericString(40);
     MASTER_REPL_OFFSET = 0;
