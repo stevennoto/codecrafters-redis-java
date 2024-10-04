@@ -90,11 +90,26 @@ public class Main {
 
     if (CONFIG.containsKey(RedisConfig.REPLICA_OF)) {
       try {
+        // Connect to master
         String[] replicaOfHostPort = CONFIG.get(RedisConfig.REPLICA_OF).split(" ");
         String replicaOfHost = replicaOfHostPort[0];
         int replicaOfPort = Integer.parseInt(replicaOfHostPort[1]);
         RedisClient redisClient = new RedisClient(replicaOfHost, replicaOfPort);
+        // send PING
         redisClient.send(RespUtil.serializeArray(List.of("PING")));
+        if (!redisClient.getReplyLine().equals("+PONG")) {
+          throw new RuntimeException("Invalid PING reply from master");
+        }
+        // send REPLCONF with port
+        redisClient.send(RespUtil.serializeArray(List.of("REPLCONF", "listening-port", String.valueOf(PORT))));
+        if (!redisClient.getReplyLine().equals("+OK")) {
+          throw new RuntimeException("Invalid REPLCONF reply from master");
+        }
+        // send REPLCONF with (hardcoded for now) capabilities
+        redisClient.send(RespUtil.serializeArray(List.of("REPLCONF", "capa", "psync2")));
+        if (!redisClient.getReplyLine().equals("+OK")) {
+          throw new RuntimeException("Invalid REPLCONF reply from master");
+        }
         IS_MASTER = false;
         System.out.println("Set as slave replica of: " + replicaOfHost + ":" + replicaOfPort);
       } catch (Exception e) {
