@@ -110,6 +110,11 @@ public class Main {
         if (!redisClient.getReplyLine().equals("+OK")) {
           throw new RuntimeException("Invalid REPLCONF reply from master");
         }
+        // send PSYNC to ask for replication id and offset
+        redisClient.send(RespUtil.serializeArray(List.of("PSYNC", "?", "-1")));
+        if (!redisClient.getReplyLine().startsWith("+FULLRESYNC")) { // TODO handle repl id and offset
+          throw new RuntimeException("Invalid PSYNC reply from master");
+        }
         IS_MASTER = false;
         System.out.println("Set as slave replica of: " + replicaOfHost + ":" + replicaOfPort);
       } catch (Exception e) {
