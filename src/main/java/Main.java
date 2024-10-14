@@ -220,6 +220,12 @@ public class Main {
           // TODO handle pattern matching
           return RespUtil.serializeBulkString(null);
         }
+      case "REPLCONF":
+        String replyConfKey = commandArray.get(1);
+        String replyConfValue = commandArray.get(2);
+        System.out.println("Received REPLCONF: " + replyConfKey + " " + replyConfValue);
+        // TODO: use these values
+        return RespUtil.serializeBulkString("OK");
       default:
         return "";
     }
