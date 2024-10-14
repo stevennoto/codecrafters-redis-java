@@ -226,6 +226,12 @@ public class Main {
         System.out.println("Received REPLCONF: " + replyConfKey + " " + replyConfValue);
         // TODO: use these values
         return RespUtil.serializeBulkString("OK");
+      case "PSYNC":
+        String psyncReplId = commandArray.get(1);
+        String psyncReplOffset = commandArray.get(2);
+        System.out.println("Received PSYNC: " + psyncReplId + " " + psyncReplOffset);
+        // TODO: use these values
+        return RespUtil.serializeBulkString("FULLRESYNC " + MASTER_REPLID + " " + MASTER_REPL_OFFSET);
       default:
         return "";
     }
